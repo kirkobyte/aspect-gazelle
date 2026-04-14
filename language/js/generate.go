@@ -103,9 +103,7 @@ func (ts *typeScriptLang) GenerateRules(args language.GenerateArgs) language.Gen
 	ts.addPackageRules(cfg, args, &result)
 	ts.addSourceRules(cfg, args, &result)
 
-	if cfg.GetTsConfigGenerationEnabled("") {
-		ts.addTsConfigRules(cfg, args, &result)
-	}
+	ts.addTsConfigRules(cfg, args, &result)
 
 	if cfg.ProtoGenerationEnabled() {
 		ts.addTsProtoRules(cfg, args, &result)
@@ -137,7 +135,6 @@ func (ts *typeScriptLang) tsPackageInfoToRelsToIndex(cfg *JsGazelleConfig, args 
 }
 
 func (ts *typeScriptLang) addSourceRules(cfg *JsGazelleConfig, args language.GenerateArgs, result *language.GenerateResult) {
-	tsconfigRel, tsconfig := ts.tsconfig.FindConfig(args.Rel, "")
 
 	// Create a set of source and generated source files per target.
 	sourceFileGroups := make(map[string][]string, len(cfg.GetSourceTargets()))
@@ -146,25 +143,11 @@ func (ts *typeScriptLang) addSourceRules(cfg *JsGazelleConfig, args language.Gen
 	// Collect data files which *may* be added to a target if imported within the sources.
 	dataFiles := make([]string, 0, 5)
 
-	// Calculate the tsconfig rootDir relative to the current directory being walked
-	tsconfigRootDir := "."
-	if tsconfig != nil {
-		tsconfigRootDir = path.Join(tsconfigRel, tsconfig.RootDir)
-
-		// Ignore rootDirs not within args.Rel
-		if args.Rel != "" && !strings.HasPrefix(tsconfigRootDir, args.Rel+"/") {
-			tsconfigRootDir = "."
-		} else if args.Rel != "" {
-			// Make the rootDir relative to the current directory being walked
-			tsconfigRootDir = tsconfigRootDir[len(args.Rel)+1:]
-		}
-	}
-
 	// Util for adding a file to a source group or the data files.
 	processPotentialSourceFile := func(groups map[string][]string, file string) {
 		fileExt := path.Ext(file)
 		if isSourceFileExt(fileExt) || isDataFileExt(fileExt) {
-			if target := cfg.GetFileSourceTarget(file, tsconfigRootDir); target != nil {
+			if target := cfg.GetFileSourceTarget(file, ts.tsconfig); target != nil {
 				// Source files belonging to a target group.
 				if BazelLog.IsTraceEnabled() {
 					BazelLog.Tracef("add '%s' src '%s/%s'", target.name, args.Rel, file)
@@ -583,6 +566,7 @@ func (ts *typeScriptLang) addProjectRule(cfg *JsGazelleConfig, tsconfigRel strin
 	}
 
 	sourceRule.SetPrivateAttr("ts_project_info", info)
+	sourceRule.SetPrivateAttr("ts_group_name", group.name)
 	if ruleKind == TsProjectKind {
 		var assetFiles []string
 		srcFiles := make([]string, 0, info.sources.Size())
