@@ -91,6 +91,21 @@ func (tc *TsWorkspace) GetAllTsConfigFiles(rel string) []TsConfigWithGroup {
 	return configs
 }
 
+// GetParsedTsConfig returns the parsed TsConfig for a file in the given directory,
+// even if it isn't registered to a group. Returns nil if the file can't be parsed.
+func (tc *TsWorkspace) GetParsedTsConfig(rel, fileName string) *TsConfig {
+	// Find the root from any existing config in the same directory.
+	var root string
+	for _, p := range tc.cm.configFiles[rel] {
+		root = p.root
+		break
+	}
+	if root == "" {
+		return nil
+	}
+	return tc.getTsConfigFromPath(&workspacePath{root: root, rel: rel, fileName: fileName})
+}
+
 func (tc *TsWorkspace) getTsConfigFromPath(p *workspacePath) *TsConfig {
 	// Lock the configs mutex
 	tc.cm.configsMutex.Lock()

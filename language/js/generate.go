@@ -341,22 +341,41 @@ func (ts *typeScriptLang) addPackageRule(cfg *JsGazelleConfig, args language.Gen
 }
 
 func (ts *typeScriptLang) addTsConfigRules(cfg *JsGazelleConfig, args language.GenerateArgs, result *language.GenerateResult) {
+	generated := make(map[string]bool)
+
 	for _, entry := range ts.tsconfig.GetAllTsConfigFiles(args.Rel) {
-		tsconfig := entry.Config
+		ts.addTsConfigRule(cfg, args, result, entry.Config, entry.GroupName, generated)
+	}
+}
 
-		imports := newTsProjectInfo()
-		for _, impt := range ts.collectTsConfigImports(cfg, args, tsconfig) {
-			imports.AddImport(impt)
+func (ts *typeScriptLang) addTsConfigRule(cfg *JsGazelleConfig, args language.GenerateArgs, result *language.GenerateResult, tsconfig *typescript.TsConfig, groupName string, generated map[string]bool) {
+	if generated[tsconfig.ConfigName] {
+		return
+	}
+	generated[tsconfig.ConfigName] = true
+
+	imports := newTsProjectInfo()
+	for _, impt := range ts.collectTsConfigImports(cfg, args, tsconfig) {
+		imports.AddImport(impt)
+	}
+
+	tsconfigName := cfg.RenderTsConfigName(tsconfig.ConfigName)
+	tsconfigRule := rule.NewRule(TsConfigKind, tsconfigName)
+	tsconfigRule.SetAttr("src", tsconfig.ConfigName)
+	tsconfigRule.SetAttr("visibility", []string{":__subpackages__"})
+
+	result.Gen = append(result.Gen, tsconfigRule)
+	result.Imports = append(result.Imports, imports)
+	result.RelsToIndex = append(result.RelsToIndex, ts.tsPackageInfoToRelsToIndex(cfg, args, imports, groupName)...)
+
+	// Generate rules for local tsconfigs referenced via extends that don't
+	// already have a rule (e.g. shared base configs like tsconfig.base.json).
+	if tsconfig.Extends != "" && !strings.Contains(tsconfig.Extends, "/") {
+		if common.WalkHasPath(args.Rel, tsconfig.Extends) {
+			if dep := ts.tsconfig.GetParsedTsConfig(args.Rel, tsconfig.Extends); dep != nil {
+				ts.addTsConfigRule(cfg, args, result, dep, "", generated)
+			}
 		}
-
-		tsconfigName := cfg.RenderTsConfigName(tsconfig.ConfigName)
-		tsconfigRule := rule.NewRule(TsConfigKind, tsconfigName)
-		tsconfigRule.SetAttr("src", tsconfig.ConfigName)
-		tsconfigRule.SetAttr("visibility", []string{":__subpackages__"})
-
-		result.Gen = append(result.Gen, tsconfigRule)
-		result.Imports = append(result.Imports, imports)
-		result.RelsToIndex = append(result.RelsToIndex, ts.tsPackageInfoToRelsToIndex(cfg, args, imports, entry.GroupName)...)
 	}
 }
 

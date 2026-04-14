@@ -8,9 +8,3 @@
 # gazelle:js_test_files {dirname}_tests **/*.{test,spec}.{ts,tsx,mjs,mts}
 # gazelle:js_test_files {dirname}_e2e **/*.e2e.ts
 # gazelle:js_tsconfig_file {dirname}_e2e tsconfig.e2e.json
-
-ts_config(
-    name = "tsconfig_base",
-    src = "tsconfig.base.json",
-    visibility = ["//visibility:public"],
-)
